@@ -72,8 +72,17 @@ io.on('connection', (socket) => {
   let currentLobbyId = null;
   let playerData = null;
   
+  // Set a timeout to prevent zombie connections
+  const connectionTimeout = setTimeout(() => {
+    if (!playerData) {
+      console.log('Disconnecting inactive socket:', socket.id);
+      socket.disconnect();
+    }
+  }, 30000); // 30 seconds to authenticate
+  
   // Create lobby
   socket.on('create-lobby', (data, callback) => {
+    clearTimeout(connectionTimeout); // Clear timeout on first action
     const { playerId, playerName } = data;
     const lobbyId = generateLobbyId();
     
@@ -249,8 +258,12 @@ io.on('connection', (socket) => {
   });
   
   // Handle disconnect
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, 'Reason:', reason);
+    clearTimeout(connectionTimeout); // Clear any pending timeout
+    
+    // Clean up player socket mapping
+    playerSocketMap.delete(socket.id);
     
     // Don't remove player immediately - they might reconnect
     if (currentLobbyId && playerData) {
